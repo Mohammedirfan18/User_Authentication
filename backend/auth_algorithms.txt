@@ -1,0 +1,63 @@
+User Authentication :
+
+1.User Registration:
+
+-> get user details from the frontend
+-> validate data (!empty)
+-> check if user already exists in db
+-> create user 
+-> generate token and store in db (to verify the email)
+-> save the user
+-> send mail to the user which contains url (url contains token)
+
+//we have used pre hook of mongoose which helps us hash the password before saving it 
+
+2.User Verification:
+
+-> get the token from the params
+-> get the user based on token (if not found return error)
+-> set user as verified and token as undefined
+
+3.User Login:
+
+-> get the user details
+-> validate
+-> check the user in db based on email(if not found return)
+-> get the password from db and compare using bcrypt.compare(user.password,password)
+-> if true
+-> create jwt token it takes data,key,expiry time
+-> create cookie options ( http only)
+-> create cookie res.cookie("cookiename",jwttoken,cookieOptions)
+
+4.User logout:
+
+-> set the jwt token to empty 
+
+5.Forgot Password :
+
+-> get email
+-> validate 
+-> check in db if exists
+-> generate token and store in db (resetPasswordToken)
+-> set resetPasswordExpires value in db for 10mins ,or 20 mins ...
+-> send url containing token
+
+6.Reset Password :
+
+-> get the token from the url
+-> get password from the req.body
+-> search user based on token and resetPasswordExpires is greater than current time 
+use ${"$gt",Date.now()}
+-> if found set the password
+-> set resetPasswordExpires and resetPasswordToken to undefined
+-> save user
+
+7.Get Profile :
+    middleware isLoggedIn:
+    -> get token from cookies 
+    -> decode the jwt token using jwt.verify(key,token)
+    -> req.user = decoded user assigned to req.user which can be used in controllers
+    getMe :
+    -> get user using req.user (exclude password)
+    -> get user from db
+    -> send the user in response 

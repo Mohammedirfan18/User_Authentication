@@ -55,8 +55,9 @@ const registerUser = async (req, res) => {
     await user.save();
 
     //send mail
-
+    
     const transporter = nodemailer.createTransport({
+      
       host: process.env.MAILTRAP_HOST,
       port: process.env.MAILTRAP_PORT,
       secure: false, // true for port 465, false for other ports
@@ -65,7 +66,7 @@ const registerUser = async (req, res) => {
         pass: process.env.MAILTRAP_PASSWORD,
       },
     });
-
+    
     const mailOption = {
       from: process.env.MAILTRAP_SENDEREMAIL, // sender address
       to: user.email, // list of receivers
@@ -74,9 +75,10 @@ const registerUser = async (req, res) => {
     ${process.env.BASE_URL}/users/verify/${token}`, // plain text body
       // html: "<b>Hello world?</b>", // html body
     };
-
+    
     // send mail with defined transport object
     await transporter.sendMail(mailOption);
+    
     res.status(201).json({
       message: "User registered successfully",
       success: true,
@@ -190,4 +192,135 @@ const login = async (req,res) => {
             })
         }
 }
-export {registerUser,verifyUser,login}
+
+const logout = async (req,res) => {
+    try {
+      console.log(req.cookies.token)
+      if(!req.cookies.token){
+        return res.status(400).json({
+          message:"no user logged in"
+        })
+      }
+      res.cookie("token","");//clearing jwt token
+      res.status(200).json({
+        message : "user logged out successfully",
+        success : true,
+      })
+      
+    } catch (error) {
+      console.log("error in logging out" ,error)
+      
+    }
+}
+
+const forgotPassword = async (req,res) => {
+   const {email} = req.body
+   try {
+    
+     const user = await User.findOne({email})
+    
+      if(!user){
+        return res.status(400).json({
+          message : "user doesnot exists",
+          success : false,
+        })
+      }
+      
+      const token = crypto.randomBytes(32).toString("hex");
+       user.resetPasswordToken = token;
+       user.resetPasswordExpires = Date.now() + (10*60*1000) //10 mins after current time
+      await user.save()
+      
+      
+      const transporter = nodemailer.createTransport({
+      
+        host: process.env.MAILTRAP_HOST,
+        port: process.env.MAILTRAP_PORT,
+        secure: false, // true for port 465, false for other ports
+        auth: {
+          user: process.env.MAILTRAP_USERNAME,
+          pass: process.env.MAILTRAP_PASSWORD,
+        },
+      });
+            const mailOption = {
+        from: process.env.MAILTRAP_SENDEREMAIL, // sender address
+        to: user.email, // list of receivers
+        subject: "Verify your email", // Subject line
+        text: `Please click on the following link:
+      ${process.env.BASE_URL}/users/reset/${token}`, // plain text body
+        // html: "<b>Hello world?</b>", // html body
+      };
+    
+      await transporter.sendMail(mailOption);
+      
+    res.status(201).json({
+      message: "reset link shared on email",
+      success: true,
+    });
+
+   } catch (error) {
+   
+    res.status(400).json({
+      message: "fail to reset the password",
+      err,
+      success: false,
+    });
+   }
+}
+
+const resetPassword = async (req,res) => {
+   const {token} = req.params;
+   const {password} = req.body;
+
+   try {
+    const user = await User.findOne({
+      resetPasswordToken : token,
+      resetPasswordExpires : {$gt:Date.now()}
+    })
+
+    if(!user)
+    {
+      return res.status(400).json({
+        message: "User is not registered ",
+        success: false,
+      });
+    }
+    user.password = password;
+    await user.save()
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    res.status(200).json({
+      message : "Password successfully updated",
+      success : true,
+    })
+   } catch (error) {
+    res.status(400).json({
+      message: "fail to reset the password",
+      err,
+      success: false,
+    });
+   }
+}
+
+const profile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select("-password");
+    console.log(user);
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      user,
+    });
+  } catch (error) {
+    console.log("Error in get me", error);
+  }
+};
+
+export {registerUser,verifyUser,login,logout,forgotPassword,resetPassword,profile}
